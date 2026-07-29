@@ -39,6 +39,40 @@ type GlobalSchemaOpts struct {
 
 	// DiscriminatorDepth tracks recursion depth to prevent infinite loops in discriminator resolution
 	DiscriminatorDepth int
+
+	// VisitedRefs tracks the set of schema $ref locations currently open on the
+	// descent path (keyed by the reference string, e.g. "#/components/schemas/IngestColumn").
+	// It is used to detect self-referential (recursive) schemas: if a schema being
+	// expanded references a location that is already on the path, we have a cycle.
+	// Terraform's plugin framework has no recursive nested type, so such an edge is
+	// degraded to a `dynamic` attribute rather than recursing forever (which stack overflows).
+	VisitedRefs map[string]bool
+}
+
+// WithVisitedRef returns a copy of the GlobalSchemaOpts with the given reference
+// added to the VisitedRefs set. It allocates a new map so that sibling branches of
+// the schema tree do not share mutation - i.e. adding a ref on one branch must not
+// leak into the parent's map or into unrelated sibling branches.
+func (o GlobalSchemaOpts) WithVisitedRef(ref string) GlobalSchemaOpts {
+	newVisited := make(map[string]bool, len(o.VisitedRefs)+1)
+	for k, v := range o.VisitedRefs {
+		newVisited[k] = v
+	}
+	newVisited[ref] = true
+
+	o.VisitedRefs = newVisited
+	return o
+}
+
+// IsVisitedRef reports whether the given schema proxy is a reference ($ref) to a
+// location that has already been visited on the current descent path. When true, the
+// proxy re-enters a type already being expanded, which is a reference cycle.
+func (o GlobalSchemaOpts) IsVisitedRef(proxy *base.SchemaProxy) bool {
+	if proxy == nil || !proxy.IsReference() {
+		return false
+	}
+
+	return o.VisitedRefs[proxy.GetReference()]
 }
 
 // SchemaOpts is NOT passed recursively through built OASSchema structs, and will only be available to the top level schema. This is used

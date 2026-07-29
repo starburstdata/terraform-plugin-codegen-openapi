@@ -2215,3 +2215,76 @@ func TestGetSetValidators(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildCollectionResource_RecursiveSchemaBecomesDynamic is a regression test for a
+// stack overflow on self-referential OpenAPI schemas. A schema with an array property
+// whose items $ref back to the enclosing schema (e.g. IngestColumn.nestedColumns)
+// previously recursed forever because the attribute builder had no cycle tracking.
+//
+// With visited-ref tracking, once the referenced schema is already open on the descent
+// path (recorded in GlobalSchemaOpts.VisitedRefs), the recursive array edge is degraded
+// to a dynamic attribute instead of recursing. The build must return (not overflow) and
+// the recursive property must be a *attrmapper.ResourceDynamicAttribute.
+func TestBuildCollectionResource_RecursiveSchemaBecomesDynamic(t *testing.T) {
+	t.Parallel()
+
+	// ref simulates the enclosing schema's own $ref location. It is seeded into
+	// VisitedRefs to model the fact that we have already descended through it once
+	// (as BuildSchema does when it resolves a reference), so re-entering it via the
+	// array items is a cycle.
+	ref := "#/components/schemas/IngestColumn"
+
+	oasSchema := oas.OASSchema{
+		Schema: &base.Schema{
+			Type: []string{"object"},
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"name": base.CreateSchemaProxy(&base.Schema{
+					Type:        []string{"string"},
+					Description: "hey there! I'm a string type.",
+				}),
+				"nested_columns": base.CreateSchemaProxy(&base.Schema{
+					Type:        []string{"array"},
+					Description: "recursive nested columns",
+					// Items reference the enclosing schema, forming a cycle.
+					Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+						A: base.CreateSchemaProxyRef(ref),
+					},
+				}),
+			}),
+		},
+		GlobalSchemaOpts: oas.GlobalSchemaOpts{
+			VisitedRefs: map[string]bool{ref: true},
+		},
+	}
+
+	attributes, err := oasSchema.BuildResourceAttributes()
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	expectedAttributes := attrmapper.ResourceAttributes{
+		&attrmapper.ResourceStringAttribute{
+			Name: "name",
+			StringAttribute: resource.StringAttribute{
+				ComputedOptionalRequired: schema.ComputedOptional,
+				Description:              pointer("hey there! I'm a string type."),
+			},
+		},
+		&attrmapper.ResourceDynamicAttribute{
+			Name: "nested_columns",
+			DynamicAttribute: resource.DynamicAttribute{
+				ComputedOptionalRequired: schema.ComputedOptional,
+				Description:              pointer("recursive nested columns"),
+			},
+		},
+	}
+
+	if diff := cmp.Diff(attributes, expectedAttributes); diff != "" {
+		t.Errorf("unexpected difference: %s", diff)
+	}
+
+	// The recursive edge must specifically be a dynamic attribute.
+	if _, ok := attributes[1].(*attrmapper.ResourceDynamicAttribute); !ok {
+		t.Errorf("expected nested_columns to be a *attrmapper.ResourceDynamicAttribute, got %T", attributes[1])
+	}
+}

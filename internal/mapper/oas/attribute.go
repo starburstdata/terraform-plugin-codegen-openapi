@@ -34,6 +34,19 @@ func (s *OASSchema) BuildResourceAttributes() (attrmapper.ResourceAttributes, *S
 			return nil, s.NestSchemaError(err, name)
 		}
 
+		// If this property references a schema already open on the descent path, it is a
+		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
+		// recursing forever (which stack overflows).
+		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
+			attribute, err := pSchema.BuildDynamicResource(name, s.GetComputability(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
+		}
+
 		attribute, err := pSchema.BuildResourceAttribute(name, s.GetComputability(name))
 		if err != nil {
 			return nil, err
@@ -92,6 +105,19 @@ func (s *OASSchema) BuildDataSourceAttributes() (attrmapper.DataSourceAttributes
 			return nil, s.NestSchemaError(err, name)
 		}
 
+		// If this property references a schema already open on the descent path, it is a
+		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
+		// recursing forever (which stack overflows).
+		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
+			attribute, err := pSchema.BuildDynamicDataSource(name, s.GetComputability(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
+		}
+
 		attribute, err := pSchema.BuildDataSourceAttribute(name, s.GetComputability(name))
 		if err != nil {
 			return nil, err
@@ -148,6 +174,19 @@ func (s *OASSchema) BuildProviderAttributes() (attrmapper.ProviderAttributes, *S
 		pSchema, err := BuildSchema(pProxy, schemaOpts, s.GlobalSchemaOpts)
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
+		}
+
+		// If this property references a schema already open on the descent path, it is a
+		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
+		// recursing forever (which stack overflows).
+		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
+			attribute, err := pSchema.BuildDynamicProvider(name, s.GetOptionalOrRequired(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
 		}
 
 		attribute, err := pSchema.BuildProviderAttribute(name, s.GetOptionalOrRequired(name))

@@ -1065,6 +1065,46 @@ func TestBuildSchema_AllOfSchemaComposition(t *testing.T) {
 				},
 			},
 		},
+		"allOf with multiple elements - merge properties from each subschema": {
+			schemaProxy: base.CreateSchemaProxy(&base.Schema{
+				AllOf: []*base.SchemaProxy{
+					base.CreateSchemaProxy(&base.Schema{
+						Type: []string{"object"},
+						Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+							"bool_prop": base.CreateSchemaProxy(&base.Schema{
+								Type:        []string{"boolean"},
+								Description: "hey there! I'm a bool type.",
+							}),
+						}),
+					}),
+					base.CreateSchemaProxy(&base.Schema{
+						Type: []string{"object"},
+						Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+							"string_prop": base.CreateSchemaProxy(&base.Schema{
+								Type:        []string{"string"},
+								Description: "hey there! I'm a string type.",
+							}),
+						}),
+					}),
+				},
+			}),
+			expectedAttributes: attrmapper.ResourceAttributes{
+				&attrmapper.ResourceBoolAttribute{
+					Name: "bool_prop",
+					BoolAttribute: resource.BoolAttribute{
+						ComputedOptionalRequired: schema.ComputedOptional,
+						Description:              pointer("hey there! I'm a bool type."),
+					},
+				},
+				&attrmapper.ResourceStringAttribute{
+					Name: "string_prop",
+					StringAttribute: resource.StringAttribute{
+						ComputedOptionalRequired: schema.ComputedOptional,
+						Description:              pointer("hey there! I'm a string type."),
+					},
+				},
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -1133,19 +1173,6 @@ func TestBuildSchema_Errors(t *testing.T) {
 				},
 			}),
 			expectedErrRegex: `\[object string\] - unsupported multi-type, attribute cannot be created`,
-		},
-		"too many allOf": {
-			schemaProxy: base.CreateSchemaProxy(&base.Schema{
-				AllOf: []*base.SchemaProxy{
-					base.CreateSchemaProxy(&base.Schema{
-						Type: []string{"null"},
-					}),
-					base.CreateSchemaProxy(&base.Schema{
-						Type: []string{"string"},
-					}),
-				},
-			}),
-			expectedErrRegex: `found 2 allOf subschema\(s\), schema composition is currently not supported`,
 		},
 		"too many anyOf": {
 			schemaProxy: base.CreateSchemaProxy(&base.Schema{
