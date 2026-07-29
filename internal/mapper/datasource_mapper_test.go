@@ -823,7 +823,7 @@ func TestDataSourceMapper_basic_merges(t *testing.T) {
 					ReadOp:        createTestReadOp(testCase.readResponseSchema, testCase.readParams),
 					SchemaOptions: testCase.schemaOptions,
 				},
-			}, config.Config{})
+			}, nil, config.Config{})
 			got, err := mapper.MapToIR(slog.Default())
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)
@@ -993,7 +993,7 @@ func TestDataSourceMapper_collections(t *testing.T) {
 				"test_datasources": {
 					ReadOp: createTestReadOp(testCase.readResponseSchema, nil),
 				},
-			}, config.Config{})
+			}, nil, config.Config{})
 			got, err := mapper.MapToIR(slog.Default())
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)
