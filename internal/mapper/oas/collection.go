@@ -20,6 +20,13 @@ func (s *OASSchema) BuildCollectionResource(name string, computability schema.Co
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
 	}
 
+	// If the array item references a schema that is already open on the descent path,
+	// this is a self-referential (recursive) schema. Terraform has no recursive nested
+	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
+	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
+		return s.BuildDynamicResource(name, computability)
+	}
+
 	schemaOpts := SchemaOpts{
 		Ignores: s.SchemaOpts.Ignores,
 	}
@@ -117,6 +124,13 @@ func (s *OASSchema) BuildCollectionResource(name string, computability schema.Co
 func (s *OASSchema) BuildCollectionDataSource(name string, computability schema.ComputedOptionalRequired) (attrmapper.DataSourceAttribute, *SchemaError) {
 	if !s.Schema.Items.IsA() {
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
+	}
+
+	// If the array item references a schema that is already open on the descent path,
+	// this is a self-referential (recursive) schema. Terraform has no recursive nested
+	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
+	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
+		return s.BuildDynamicDataSource(name, computability)
 	}
 
 	schemaOpts := SchemaOpts{
@@ -218,6 +232,13 @@ func (s *OASSchema) BuildCollectionDataSource(name string, computability schema.
 func (s *OASSchema) BuildCollectionProvider(name string, optionalOrRequired schema.OptionalRequired) (attrmapper.ProviderAttribute, *SchemaError) {
 	if !s.Schema.Items.IsA() {
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
+	}
+
+	// If the array item references a schema that is already open on the descent path,
+	// this is a self-referential (recursive) schema. Terraform has no recursive nested
+	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
+	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
+		return s.BuildDynamicProvider(name, optionalOrRequired)
 	}
 
 	schemaOpts := SchemaOpts{
