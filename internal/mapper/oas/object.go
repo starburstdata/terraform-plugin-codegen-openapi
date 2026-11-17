@@ -23,6 +23,13 @@ func (s *OASSchema) BuildObjectElementType() (schema.ElementType, *SchemaError) 
 		}
 
 		pProxy := pair.Value()
+
+		// A property that re-enters an enclosing schema would recurse forever; carry it as JSON text.
+		if s.GlobalSchemaOpts.reentersVisitedRef(pProxy) {
+			objectElemTypes = append(objectElemTypes, util.CreateObjectAttributeType(name, schema.ElementType{String: &schema.StringType{}}))
+			continue
+		}
+
 		schemaOpts := SchemaOpts{
 			Ignores: s.GetIgnoresForNested(name),
 		}

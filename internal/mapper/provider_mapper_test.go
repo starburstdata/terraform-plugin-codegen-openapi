@@ -250,7 +250,7 @@ func TestProviderMapper_basic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			mapper := mapper.NewProviderMapper(testCase.exploredProvider, config.Config{})
+			mapper := mapper.NewProviderMapper(testCase.exploredProvider, nil, config.Config{})
 			got, err := mapper.MapToIR(slog.Default())
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)

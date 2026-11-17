@@ -34,6 +34,18 @@ func (s *OASSchema) BuildResourceAttributes() (attrmapper.ResourceAttributes, *S
 			return nil, s.NestSchemaError(err, name)
 		}
 
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringResource(name, s.GetComputability(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
+		}
+
 		attribute, err := pSchema.BuildResourceAttribute(name, s.GetComputability(name))
 		if err != nil {
 			return nil, err
@@ -92,6 +104,18 @@ func (s *OASSchema) BuildDataSourceAttributes() (attrmapper.DataSourceAttributes
 			return nil, s.NestSchemaError(err, name)
 		}
 
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringDataSource(name, s.GetComputability(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
+		}
+
 		attribute, err := pSchema.BuildDataSourceAttribute(name, s.GetComputability(name))
 		if err != nil {
 			return nil, err
@@ -148,6 +172,18 @@ func (s *OASSchema) BuildProviderAttributes() (attrmapper.ProviderAttributes, *S
 		pSchema, err := BuildSchema(pProxy, schemaOpts, s.GlobalSchemaOpts)
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
+		}
+
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringProvider(name, s.GetOptionalOrRequired(name))
+			if err != nil {
+				return nil, err
+			}
+
+			objectAttributes = append(objectAttributes, attribute)
+			continue
 		}
 
 		attribute, err := pSchema.BuildProviderAttribute(name, s.GetOptionalOrRequired(name))
