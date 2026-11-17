@@ -31,7 +31,7 @@ func (s *OASSchema) BuildMapResource(name string, computability schema.ComputedO
 	}
 
 	if mapSchema.Type == util.OAS_type_object {
-		mapAttributes, err := mapSchema.BuildResourceAttributes()
+		mapAttributes, err := mapSchema.withAncestorName(name).BuildResourceAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -92,7 +92,7 @@ func (s *OASSchema) BuildMapDataSource(name string, computability schema.Compute
 	}
 
 	if mapSchema.Type == util.OAS_type_object {
-		mapAttributes, err := mapSchema.BuildDataSourceAttributes()
+		mapAttributes, err := mapSchema.withAncestorName(name).BuildDataSourceAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -154,7 +154,7 @@ func (s *OASSchema) BuildMapProvider(name string, optionalOrRequired schema.Opti
 	}
 
 	if mapSchema.Type == util.OAS_type_object {
-		mapAttributes, err := mapSchema.BuildProviderAttributes()
+		mapAttributes, err := mapSchema.withAncestorName(name).BuildProviderAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -199,6 +199,15 @@ func (s *OASSchema) BuildMapElementType() (schema.ElementType, *SchemaError) {
 	// also be a boolean (which we should ignore and map to an ObjectType), so calling functions should call s.IsMap() first.
 	if !s.IsMap() {
 		return schema.ElementType{}, SchemaErrorFromNode(errors.New("invalid map, additionalProperties doesn't have a valid schema"), s.Schema, AdditionalProperties)
+	}
+
+	// Values that re-enter an enclosing schema would recurse forever; carry them as JSON text.
+	if s.GlobalSchemaOpts.reentersVisitedRef(s.Schema.AdditionalProperties.A) {
+		return schema.ElementType{
+			Map: &schema.MapType{
+				ElementType: schema.ElementType{String: &schema.StringType{}},
+			},
+		}, nil
 	}
 
 	schemaOpts := SchemaOpts{

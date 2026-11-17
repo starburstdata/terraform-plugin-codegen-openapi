@@ -20,11 +20,10 @@ func (s *OASSchema) BuildCollectionResource(name string, computability schema.Co
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
 	}
 
-	// If the array item references a schema that is already open on the descent path,
-	// this is a self-referential (recursive) schema. Terraform has no recursive nested
-	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
-	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
-		return s.BuildDynamicResource(name, computability)
+	// An array whose items re-enter an enclosing schema is a recursive edge. Terraform has no
+	// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+	if s.GlobalSchemaOpts.reentersVisitedRef(s.Schema.Items.A) {
+		return s.BuildJSONStringResource(name, computability)
 	}
 
 	schemaOpts := SchemaOpts{
@@ -37,7 +36,7 @@ func (s *OASSchema) BuildCollectionResource(name string, computability schema.Co
 
 	// If the items schema is a map (i.e. additionalProperties set to a schema), it cannot be a NestedAttribute
 	if itemSchema.Type == util.OAS_type_object && !itemSchema.IsMap() {
-		objectAttributes, err := itemSchema.BuildResourceAttributes()
+		objectAttributes, err := itemSchema.withAncestorName(name).BuildResourceAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -126,11 +125,10 @@ func (s *OASSchema) BuildCollectionDataSource(name string, computability schema.
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
 	}
 
-	// If the array item references a schema that is already open on the descent path,
-	// this is a self-referential (recursive) schema. Terraform has no recursive nested
-	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
-	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
-		return s.BuildDynamicDataSource(name, computability)
+	// An array whose items re-enter an enclosing schema is a recursive edge. Terraform has no
+	// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+	if s.GlobalSchemaOpts.reentersVisitedRef(s.Schema.Items.A) {
+		return s.BuildJSONStringDataSource(name, computability)
 	}
 
 	schemaOpts := SchemaOpts{
@@ -143,7 +141,7 @@ func (s *OASSchema) BuildCollectionDataSource(name string, computability schema.
 
 	// If the items schema is a map (i.e. additionalProperties set to a schema), it cannot be a NestedAttribute
 	if itemSchema.Type == util.OAS_type_object && !itemSchema.IsMap() {
-		objectAttributes, err := itemSchema.BuildDataSourceAttributes()
+		objectAttributes, err := itemSchema.withAncestorName(name).BuildDataSourceAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -234,11 +232,10 @@ func (s *OASSchema) BuildCollectionProvider(name string, optionalOrRequired sche
 		return nil, s.SchemaErrorFromProperty(errors.New("invalid array items property, doesn't have a schema"), name)
 	}
 
-	// If the array item references a schema that is already open on the descent path,
-	// this is a self-referential (recursive) schema. Terraform has no recursive nested
-	// type, so degrade this edge to a dynamic attribute instead of recursing forever.
-	if s.GlobalSchemaOpts.IsVisitedRef(s.Schema.Items.A) {
-		return s.BuildDynamicProvider(name, optionalOrRequired)
+	// An array whose items re-enter an enclosing schema is a recursive edge. Terraform has no
+	// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+	if s.GlobalSchemaOpts.reentersVisitedRef(s.Schema.Items.A) {
+		return s.BuildJSONStringProvider(name, optionalOrRequired)
 	}
 
 	schemaOpts := SchemaOpts{
@@ -251,7 +248,7 @@ func (s *OASSchema) BuildCollectionProvider(name string, optionalOrRequired sche
 
 	// If the items schema is a map (i.e. additionalProperties set to a schema), it cannot be a NestedAttribute
 	if itemSchema.Type == util.OAS_type_object && !itemSchema.IsMap() {
-		objectAttributes, err := itemSchema.BuildProviderAttributes()
+		objectAttributes, err := itemSchema.withAncestorName(name).BuildProviderAttributes()
 		if err != nil {
 			return nil, s.NestSchemaError(err, name)
 		}
@@ -329,6 +326,11 @@ func (s *OASSchema) BuildCollectionElementType() (schema.ElementType, *SchemaErr
 		return schema.ElementType{}, SchemaErrorFromNode(errors.New("invalid array type for nested elem array, doesn't have a schema"), s.Schema, Items)
 	}
 
+	// Items that re-enter an enclosing schema would recurse forever; carry them as JSON text.
+	if s.GlobalSchemaOpts.reentersVisitedRef(s.Schema.Items.A) {
+		return wrapCollectionElementType(s.Format, schema.ElementType{String: &schema.StringType{}}), nil
+	}
+
 	schemaOpts := SchemaOpts{
 		Ignores: s.SchemaOpts.Ignores,
 	}
@@ -342,19 +344,23 @@ func (s *OASSchema) BuildCollectionElementType() (schema.ElementType, *SchemaErr
 		return schema.ElementType{}, err
 	}
 
-	if s.Format == util.TF_format_set {
+	return wrapCollectionElementType(s.Format, elemType), nil
+}
+
+func wrapCollectionElementType(format string, elemType schema.ElementType) schema.ElementType {
+	if format == util.TF_format_set {
 		return schema.ElementType{
 			Set: &schema.SetType{
 				ElementType: elemType,
 			},
-		}, nil
+		}
 	}
 
 	return schema.ElementType{
 		List: &schema.ListType{
 			ElementType: elemType,
 		},
-	}, nil
+	}
 }
 
 func (s *OASSchema) GetListValidators() []schema.ListValidator {

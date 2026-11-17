@@ -45,8 +45,13 @@ type GlobalSchemaOpts struct {
 	// It is used to detect self-referential (recursive) schemas: if a schema being
 	// expanded references a location that is already on the path, we have a cycle.
 	// Terraform's plugin framework has no recursive nested type, so such an edge is
-	// degraded to a `dynamic` attribute rather than recursing forever (which stack overflows).
+	// degraded to a JSON string attribute rather than recursing forever (which stack overflows).
 	VisitedRefs map[string]bool
+
+	// AncestorNames tracks the names of the nested attributes enclosing the current descent path.
+	// The framework generator names nested custom types after the attribute, so a nested
+	// attribute that repeats an ancestor's name would generate a type that contains itself.
+	AncestorNames map[string][32]byte
 }
 
 // WithVisitedRef returns a copy of the GlobalSchemaOpts with the given reference
@@ -61,6 +66,19 @@ func (o GlobalSchemaOpts) WithVisitedRef(ref string) GlobalSchemaOpts {
 	newVisited[ref] = true
 
 	o.VisitedRefs = newVisited
+	return o
+}
+
+// WithAncestorName returns a copy of the GlobalSchemaOpts that records the given nested attribute
+// name and the hash of its object schema, without mutating the parent's map.
+func (o GlobalSchemaOpts) WithAncestorName(name string, hash [32]byte) GlobalSchemaOpts {
+	newNames := make(map[string][32]byte, len(o.AncestorNames)+1)
+	for k, v := range o.AncestorNames {
+		newNames[k] = v
+	}
+	newNames[name] = hash
+
+	o.AncestorNames = newNames
 	return o
 }
 

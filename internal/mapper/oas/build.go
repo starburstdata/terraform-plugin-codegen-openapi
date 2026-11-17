@@ -101,7 +101,7 @@ func BuildSchema(proxy *base.SchemaProxy, schemaOpts SchemaOpts, globalOpts Glob
 	// If the incoming schema is a reference ($ref), record it in the visited set as we
 	// descend through it. This is what lets deeper builders detect a reference cycle
 	// (a schema that transitively references itself) and degrade the recursive edge to
-	// a dynamic attribute instead of recursing forever.
+	// a JSON string attribute instead of recursing forever.
 	if proxy != nil && proxy.IsReference() {
 		globalOpts = globalOpts.WithVisitedRef(proxy.GetReference())
 	}

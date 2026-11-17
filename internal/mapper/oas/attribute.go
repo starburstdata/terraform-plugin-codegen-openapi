@@ -34,11 +34,10 @@ func (s *OASSchema) BuildResourceAttributes() (attrmapper.ResourceAttributes, *S
 			return nil, s.NestSchemaError(err, name)
 		}
 
-		// If this property references a schema already open on the descent path, it is a
-		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
-		// recursing forever (which stack overflows).
-		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
-			attribute, err := pSchema.BuildDynamicResource(name, s.GetComputability(name))
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringResource(name, s.GetComputability(name))
 			if err != nil {
 				return nil, err
 			}
@@ -105,11 +104,10 @@ func (s *OASSchema) BuildDataSourceAttributes() (attrmapper.DataSourceAttributes
 			return nil, s.NestSchemaError(err, name)
 		}
 
-		// If this property references a schema already open on the descent path, it is a
-		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
-		// recursing forever (which stack overflows).
-		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
-			attribute, err := pSchema.BuildDynamicDataSource(name, s.GetComputability(name))
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringDataSource(name, s.GetComputability(name))
 			if err != nil {
 				return nil, err
 			}
@@ -176,11 +174,10 @@ func (s *OASSchema) BuildProviderAttributes() (attrmapper.ProviderAttributes, *S
 			return nil, s.NestSchemaError(err, name)
 		}
 
-		// If this property references a schema already open on the descent path, it is a
-		// self-referential (recursive) schema. Degrade to a dynamic attribute instead of
-		// recursing forever (which stack overflows).
-		if s.GlobalSchemaOpts.IsVisitedRef(pProxy) {
-			attribute, err := pSchema.BuildDynamicProvider(name, s.GetOptionalOrRequired(name))
+		// A property that re-enters an enclosing schema is a recursive edge. Terraform has no
+		// recursive nested type, so carry the subtree as a JSON string instead of recursing.
+		if s.isRecursiveEdge(name, pProxy) {
+			attribute, err := pSchema.BuildJSONStringProvider(name, s.GetOptionalOrRequired(name))
 			if err != nil {
 				return nil, err
 			}

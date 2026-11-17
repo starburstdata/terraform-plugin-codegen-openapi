@@ -12,7 +12,7 @@ import (
 )
 
 func (s *OASSchema) BuildSingleNestedResource(name string, computability schema.ComputedOptionalRequired) (attrmapper.ResourceAttribute, *SchemaError) {
-	objectAttributes, err := s.BuildResourceAttributes()
+	objectAttributes, err := s.withAncestorName(name).BuildResourceAttributes()
 	if err != nil {
 		return nil, s.NestSchemaError(err, name)
 	}
@@ -29,7 +29,7 @@ func (s *OASSchema) BuildSingleNestedResource(name string, computability schema.
 }
 
 func (s *OASSchema) BuildSingleNestedDataSource(name string, computability schema.ComputedOptionalRequired) (attrmapper.DataSourceAttribute, *SchemaError) {
-	objectAttributes, err := s.BuildDataSourceAttributes()
+	objectAttributes, err := s.withAncestorName(name).BuildDataSourceAttributes()
 	if err != nil {
 		return nil, s.NestSchemaError(err, name)
 	}
@@ -46,7 +46,7 @@ func (s *OASSchema) BuildSingleNestedDataSource(name string, computability schem
 }
 
 func (s *OASSchema) BuildSingleNestedProvider(name string, optionalOrRequired schema.OptionalRequired) (attrmapper.ProviderAttribute, *SchemaError) {
-	objectAttributes, err := s.BuildProviderAttributes()
+	objectAttributes, err := s.withAncestorName(name).BuildProviderAttributes()
 	if err != nil {
 		return nil, s.NestSchemaError(err, name)
 	}
